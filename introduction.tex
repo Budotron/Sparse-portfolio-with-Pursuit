@@ -1,0 +1,93 @@
+\begin{section}{General Introduction}\label{sec1}
+Whether it is a solitary person seeking to furnish her retirement needs, or an insurance company which needs to fund future liabilities in the form of insurance claims, one of the most challenging decisions faced by individuals and institutions alike is how best to prepare for future financial needs \cite{Conroy2013}. One option that is usually considered attractive is to trade in \textit{assets}, which are investment instruments which can be bought and sold. Assets come in different flavours, but can be grouped into distinct \textit{asset classes}. Each asset class exhibits similar characteristics, is subject to the same laws and regulations, and assets belonging to the same class behave similarly in the marketplace. The three main classes of assets are stocks, bonds, and money market instruments \cite{Investopedia}. Beyond the question of which asset class the investor should choose to invest in, is the question of how best to allocate wealth among the different assets available in those classes. Such an allocation between and within asset classes is called a \textit{portfolio}. \\
+
+The process of selecting the most appropriate assets from among those available is called \textit{portfolio construction}. There is a staggering number of investment products available to investors, ranging from Exchange Traded Funds (ETFs), in which investors can participate for as little as USD\$50, to Mutual Funds, which may require a minimum investment in the millions of USD. The task of choosing from among this array of products often falls to an investment manager, whose job can be divided into three stages. In the first stage, she investigates the client's needs and constraints, and develops an Investment Policy Statement (IPS), which pilots the investment strategy. In the second step, the risk and return characteristics of the available products are analyzed, assets are selected in accordance with the IPS, and the trades are executed. Finally, the portfolio is monitored and reviewed, and if necessary, its composition is re-balanced if it does not align with the client's objectives, as stated in the IPS \cite{Conroy2013}. This thesis is concerned with strategies for asset selection in the crucial second step. \\
+
+A key objective in this second step is immunizing investors against financial disaster through portfolio diversification. Overinvestment in a single product is a strategy that clearly should be avoided, as was tragically illustrated by the fate that befell Enron employees in January of 2002. A majority of Enron's employees' retirement funds were completely invested in company stock, the value of which plummeted to USD\$0 from USD\$90 just one year before, financially ruining thousands of people. The benefits of diversification were already well-known by the time Harry Markowitz ushered in the modern era of portfolio theory in 1952. Markowitz argues against any investment strategy that does not encourage diversifcation, including the single-minded pursuit of high returns, as this would lead to undiversified or underdiversified portfolios \cite{Markowitz1952}. On the other hand, the purchase of securities is usually passed to a buy-side trader, who in turns contacts a broker to execute the trade, and each step of this process incurs transaction costs. Consequently, the strategy of ``holding a large number of small stock portions should be avoided'', as the transaction costs become prohibitively large \cite{Takeda2013}. Thus we seek a strategy that balances the benefits of diversification with the need to keep transaction costs low. \\
+
+In its traditional formulation, the Markowitz mean-variance optimization model assumes that the rational investor has only two goals in mind: to maximize the portfolio return, and to minimize the portfolio risk. Normally, portfolios generate two kinds of returns for investors: periodic income through dividends on the assets held, or through interest payments; and capital gain (or loss) as the prices of the assets held increase (or decrease) \cite{Singal2013}. Some assets are designed to generate revenue through only one of these mechanisms, and in this thesis, it is assumed that only the second mechanism is at work.  The (holding period) return on a portfolio is the percentage of value increased from time it was bought over a single specified time horizon. The rate of return is return per unit time \cite{Chen}. Two commonly quoted measures of average return are the geometric and arithmetic means. The former is useful for evaluating how much investment grows over several periods, whereas the latter is more commonly used for a single period investor horizon \cite{Goetzmann}, which we follow here. Risk is a notion that is difficult to express simply, but a common measure is the concept \textit{variance} borrowed from statistics, which gives a summary measure of how far spread out observations are from the statistical zero.\\
+
+In this setting, the Markowitz model is taken as a quadratic program (QP), which, for a given level of expected return, minimizes the variance over a set of feasible portfolios. For any target expected return, the solution of this QP is called the \textit{minimum variance portfolio}. Any third minimum variance portfolio can be created as a convex combination of two minimum variance portfolios with different target values. The set all such convex combinations trace out the so-called \textit{efficient frontier} in portfolio return-risk space, which the rational investor can employ to make choices \cite{Brito}. \\
+
+Despite the elegance of the Markowitz model in containing all the information needed to choose the best portfolio for any given level of risk in just a handful of statistics, it is not without its criticisms. In particular, solving the QP often results in portfolios which take extreme long positions on some assets and extreme short positions on others \cite{Jagannathan2002}; moreover, these portfolios are often completely \textit{dense}, meaning that there are few assets to which are not allocated some proportion of wealth, and, consequently, these portfolios do not respect the need to limit transaction costs\footnote{\textit{Long} and \textit{short} refers to methods of purchasing an asset. A long position trades money for an asset, which the investor then owns; a short position trades assets which the investor does not yet own for money, under the understanding that the assets will be given later on. An \textit{extreme position} refers to the scenario where unrealistic multiples of wealth are assigned to any asset.}. These problems arise from the fact that solving the mean-variance problem requires the estimation of the asset covariance matrix and taking its inverse. The estimation error is amplified when the number of securities is high, and returns are highly correlated \cite{Carrascoa}.   Refinements to the model to compensate for these problems have included prescribing upper and lower bounds on the amount of capital that can be invested into any asset (\textit{quantity constraints}), and limiting the number of assets to be held in an efficient portfolio (\textit{cardinality constraints}). The introduction of a constraint on the cardinality of the portfolio  results in a  \textit{cardinality constrained Markowitz model} which is usually modeled by the addition of binary variables to the QP, resulting in a mixed integer quadratic programming problem (MIQP), and adds a large combinatorial complexity to the optimization problem \cite{Brito}. The resulting complexity means that most existing studies on such problems focus on developing sophisticated heuristic approaches to their solutions \cite{Takeda2013}.\\
+
+One approach to dealing with extreme portfolios that has gained traction is to exploit the nature of the covariance matrix to reformulate the objective as a least squares problem. By introducing a penalty term applied to some norm of the portfolio, extreme positions are penalized and explosive solutions are avoided \cite{Carrascoa}. Furthermore, the $\ell_{1}$-norm induces sparsity in portfolio models, but does not allow for explicit control of the sparsity of the portfolio \cite{Takeda2013}. Takeda, Niranjan, Gotoh and Kawahara \cite{Takeda2013} impose control of the number of active positions by the introduction of an $\ell_{0}$-norm constraint with an $\ell_{2}$-norm penalty. In this thesis, an alternative approach for controlling the number of active positions while exploiting the least squares formulation is proposed, which applies a family of greedy algorithms borrowed from signal processing. These algorithms seek the sparsest solution to a underdetermined systems of linear equations (systems with more unknowns than equations) by choosing optimal single term updates that minimize the $\ell_{2}$ error. The goal in taking this approach is to produce portfolios which are efficient, not extreme, and whose cardinality can be directly controlled.\\
+
+The algorithms are collectively called \textit{pursuit algorithms}, and at the time of this writing, I am not aware of any other attempt to marry these algorithms to the problem of portfolio construction. Four of these algorithms were implemented: Least-Squares Orthogonal Matching Pursuit (LS-OMP), Orthogonal Matching Pursuit (OMP), Matching Pursuit (MP), and Thresholding. The \textit{out-of-sample} performance (measured by the return from capital appreciation over a single holding period) of the portfolios constructed via this approach were compared to the performance of portfolios generated by each of four baseline approaches: 
+\begin{enumerate}
+\item the solution to the QP
+\item a portfolio that assigns an equal fraction of wealth to each asset available
+\item the solution to the QP, readjusted to discard small positions until the required number of positions are achieved (backwards approach)
+\item a forward approach to selecting the largest positions that solve the QP until the required number of positions is achieved. 
+\end{enumerate}
+The portfolios generated by the new approach were found to compare \textbf{STATE RESULTS HERE}\\
+
+The remainder of this thesis is organized as follows. In the following subsection, the necessary background for portfolio construction is presented. In Chapter 2, the formulation of the Markowitz mean-variance model and its solution via each of the four baseline approaches  is discussed. In Chapter 3, pursuit algorithms are introduced and discussed, and an algorithm for a new approach to portfolio selection is presented. Chapter 4 compares and contrasts the results of the different approaches, as applied both to randomly generated data and to a historical dataset of companies listed on the Standard \& Poor's 500 stock market index. Chapter 5 concludes this thesis with a discussion of the results. 
+\end{section}
+
+\begin{section}{Necessary Background}
+This thesis concerns itself with only single period returns. Consider an asset purchased at time $t-1$ at a price $P_{t-1}$ and sold at time $t$ at a price $P_{t}$. The holding period return (HPR) on the asset, denoted $R_{t}$, is $$R_{t}=\frac{P_{t-1}}{P_t}-1$$
+The HPR belongs to a set of scenarios, to each of which is is possible to assign a probability of its occurrence. This set of probabilities is called the \textit{distribution} of the HPR. According to the \textit{Constant Expected Return Model} (CER), it can be assumed that an asset's return over time is independent and identically normally distributed with a time-invariant mean $\mu$ and variance $\sigma^{2}$. The CER is widely used in finance \cite{Zivotb}, and it is adopted here. \\
+Under this assumption, one can consider $n$ investable assets, the index set of which is $N:=\left\lbrace
+1, 2, \dots, n
+\right\rbrace$, so the random vector of returns can be written \sloppy $\mathbf{R}=\left(
+R_1, R_2, \dots, \allowbreak R_n
+\right)$. The \textit{expected return} of asset $i$ is $\mathbb{E}\left[
+R_{i}
+\right]=\mu_{i}$ and its risk is $\text{Var}\left(
+R_{i}
+\right)=\sigma_{i}^{2}$. Let $\pi_{i}$ be the proportion of total available wealth for investment allocated to asset $i$, so $\boldsymbol\pi=\begin{pmatrix}
+\pi_{1}, \pi_{2}, \dots, \pi_{n}
+\end{pmatrix}^{\top}$ is the vector of \textit{portfolio weights} and $\sum\limits_{i=1}^{n}\pi_{i}=1$. Then the expected return of the portfolio is $$\mu_{P}=\mathbb{E}\left[
+\mathbf{R}
+\right]=\sum\limits_{i=1}^{n}\pi_{i}\mu_{i}=\boldsymbol\mu^{\top}\boldsymbol\pi$$ where $\boldsymbol\mu=\begin{pmatrix}
+\mu_{1}, \dots, \mu_{n}
+\end{pmatrix}^{\top}$. 
+The portfolio risk is 
+\begin{align*}
+\sigma_{P}^{2}=\text{Var}(\mathbf{R)}&=\mathbb{E}\left[
+\left(
+\sum\limits_{i=1}^{n}\pi_{i}R_{i}-\mathbb{E}\left[
+\sum\limits_{i=1}^{n}\pi_{i}R_{i}
+\right]
+\right)^{2}
+\right]\\
+&=\sum\limits_{i=1}^{n}\sum\limits_{j=1}^{n}\mathbb{E}\left[
+\left(
+R_i-\mu_i
+\right)
+\left(
+R_j-\mu_j
+\right)
+\right]\pi_i\pi_j\\
+&=\boldsymbol\pi^{\top}\Sigma \boldsymbol\pi
+\end{align*}
+where $$\Sigma=\begin{pmatrix}
+\sigma_{1}^{2} & \sigma_{1,2} &\dots &\sigma_{1, n}\\
+\sigma_{1, 2} & \sigma_{2}^{2} &\dots&\sigma_{2, n}\\
+\vdots& &\ddots&\vdots\\
+\sigma_{1, n}&\sigma_{2, n} &\dots &\sigma_{n}^{2}
+\end{pmatrix}$$ is the positive definite covariance matrix of returns, of which the entry $i, j$ is $\sigma_{i, j}=\mathbb{E}\left[
+\left(
+R_i-\mu_i
+\right)
+\left(
+R_j-\mu_j
+\right)
+\right]$ is the covariance between assets $i$ and $j$. In practice, for any asset the parameters $\mu$ and $\sigma^{2}$ are unknown, and have to be estimated from the historical data by the maximum likelihood estimates $$\hat{\mu}=\bar{R}=\frac{1}{T}\sum\limits_{t=1}^{T}R_{t}$$ and $$s^{2}=\frac{1}{T-1}\sum\limits_{T=1}^{n}\left(R_T-\bar{R} \right)^{2}$$ respectively. \\
+
+The risk-return profile of any portfolio is a point in $\sigma^{2}$-$\mu$ space. Portfolio $A$ is said to \textit{dominate} portfolio $B$, if $A$ provides no worse a return than $B$ for no more risk. This is expressed by $$A>B\implies \mu_{A}\geq \mu_{B} \ \text{and}\  \sigma_{A}^{2}\leq \sigma_{B}^{2}$$ In $\sigma^{2}$-$\mu$ space, $A>B$ when $A$ belongs to the second quadrant of axes originating at $B$. Any portfolio that is not dominated by any other portfolio is said to be \textit{efficient}. The set of all efficient portfolios trace out the upper half of a parabola in $\sigma^{2}$-$\mu$ space, called the \textit{efficient frontier}. Of the efficient frontier portfolios, the one with the lowest risk-return profile is called the \textit{global minimum variance portfolio}. It should be mentioned that in real-world practice, it is possible to further reduce the risk of a portfolio by combining the risky portfolio with a (nominally) risk free component, such as treasuries or gold. The set of efficient portfolios resulting from this combination is called the \textit{optimal allocation line}. However, the existence of a risk free asset is not assumed under the assumptions of the classical Markowitz model, and will not be further considered in this thesis. \\
+
+The \textit{cardinality} of a portfolio is the number of non-zero elements in the portfolio. If $q\geq 1$, the $\ell_{q}$-norm of a vector $\mathbf{x}\in \mathbb{R}^{n}$ is $$\lVert
+\mathbf{x}
+\rVert_{q}:=\left[
+\sum\limits_{i=1}^{n}\lvert
+x_{i}
+\rvert^{q}
+\right]^{1/q}$$
+The quantity $\lVert
+\mathbf{x}
+\rVert_{0}:=\underset{q\rightarrow 0^{+}}{\text{lim}}\lVert
+\mathbf{x}
+\rVert_{q}$ is the number of non-zero elements in $\mathbf{x}$, and is by convention called the $\ell_{0}$-norm, even though it does not satisfy all norm axioms. The \textit{support} of a vector $\mathbf{x} \in \mathbb{R}^{n}$, denoted $supp(\mathbf{x})$, is the index set of the non-zero elements in $\mathbf{x}$. 
+\end{section}

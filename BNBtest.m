@@ -1,0 +1,288 @@
+
+        
+
+clc, clear all
+load datapoints
+[~,totalAssets]=size(datapoints);
+kcount=0;
+for i=1:50
+    i
+    kcount=kcount+1;
+    choose=randsample(totalAssets, 100)
+    load dataSets 
+    threshold=1e-8;
+    dataSetCount=0;
+    for dataSetNumber=1:length(datasets)-1
+        dataSetCount=dataSetCount+1
+        thisPeriodPrices=datasets{dataSetNumber}(:, choose);
+        nextPeriodPrices=datasets{dataSetNumber+1}(:, choose);
+        [numPrices, numAssets]=size(thisPeriodPrices);
+        investmentPrice=thisPeriodPrices(numPrices, :); %price today
+        rewardPrice_year=nextPeriodPrices(numPrices, :);
+        rewardPrice_1month=nextPeriodPrices(30, :);
+        rewardPrice_3months=nextPeriodPrices(90, :); 
+        retmat=makeReturnsMatrix(thisPeriodPrices);    
+        muvec=mean(retmat)'; %vector of expected returns
+        Sigma=cov(retmat);   %covariance matrix of return vectors
+        onesvec=ones(length(muvec), 1);    
+        gvx=globalMinimumVariancePortfolio(Sigma, onesvec); %portfolio from 
+                                                            %ignoring
+                                                            %target constraint
+        betaMin=muvec'*gvx; %expected return of GMV portfolio. Any portfolio 
+                            %with a higer expected return will be non-dominated
+        M=[muvec onesvec]; %concatenation for use in formula     
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%   set up 1/N portfolio    %%%%%%%%%%%%%%%%%%%%%%%
+        oneOnNPortfolio{dataSetNumber}=repmat(1/numAssets, [numAssets,1]);  
+        %%%%%%%%%%%%%%% expected returns on 1/N ports per period %%%%%%%%%%%%%
+        ExpectedOneOnNReturns( dataSetNumber)=muvec'*oneOnNPortfolio{dataSetNumber} ;    
+
+        %%%%%%%%%%%%%%%%%%%%%%% 1/N portfolio variance %%%%%%%%%%%%%%%%%%%%%%%%
+        oneOnNVar( dataSetNumber)=...
+             calculatePortfolioVarience(oneOnNPortfolio{dataSetNumber}, Sigma);
+
+        %%%%%%%%%%%%%%%% calculate returns on 1/N ports per period %%%%%%%%%%%%
+        realOneOnNReturns_month(dataSetNumber)=...
+        returnOnInvestment(investmentPrice, rewardPrice_1month,...
+        oneOnNPortfolio{dataSetNumber});
+        realOneOnNReturns_3months(dataSetNumber)=...
+        returnOnInvestment(investmentPrice, rewardPrice_3months,...
+        oneOnNPortfolio{dataSetNumber});
+        realOneOnNReturns_year( dataSetNumber)=...
+        returnOnInvestment(investmentPrice, rewardPrice_year,...
+        oneOnNPortfolio{ dataSetNumber});
+
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+        beta=ExpectedOneOnNReturns(dataSetNumber)  ;  
+        
+
+            desiredSparsity=50
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%% BNB solution by YALMIP %%%%%%%%%%%%%%%%%%%%%%
+            BNBX{dataSetNumber, kcount}=...
+                branchAndBoundSolve(Sigma, beta, muvec', desiredSparsity);
+            capture(dataSetNumber, kcount)=nnz(BNBX{dataSetNumber, kcount});
+            keyboard
+            assetsChosenBNBX{dataSetNumber, kcount}=names(find(BNBX{dataSetNumber, kcount}))
+            realBNBReturns_month(dataSetNumber, kcount)=...
+            returnOnInvestment(investmentPrice, rewardPrice_1month,...
+            BNBX{dataSetNumber, kcount})
+            realBNBReturns_3months(dataSetNumber, kcount)=...
+            returnOnInvestment(investmentPrice, rewardPrice_3months,...
+            BNBX{dataSetNumber, kcount});
+            realBNBReturns_year(dataSetNumber, kcount)=...
+            returnOnInvestment(investmentPrice, rewardPrice_year,...
+            BNBX{dataSetNumber, kcount});
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+            sparsity_number=0; 
+            for desiredSparsity=10:10:50 
+                sparsity_number=sparsity_number+1
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%% Pursuit selection setup%%%%%%%%%%%%%%%%%%%
+            A=retmat;
+            W=sqrt(diag(A'*A));
+            for k=1:1:numAssets, 
+                A(:,k)=A(:,k)/W(k); 
+            end;
+            b=beta*ones(numPrices-1, 1);
+
+            %%%%%%%%%%%%%%%%%%%% all selection strategy %%%%%%%%%%%%%%%%%%%
+            %idea:            
+            %for each dataset
+            %    for each target return
+            %        for each desired sparsity
+            %            use PA to select a K-sparse approximant to the vector 
+            %            b(=beta) with respect to the dictionary formed by the 
+            %            matrix of all returns(=retmat)
+            %        end
+            %        use formula to reclaibrate the K-sparse approximant into
+            %        a portfolio with target return beta
+            %    end
+            %    calculate the returns over the time horizons
+            %end
+            %%%%%%%%%%%%%%%%%%%%% Implement Part (1) %%%%%%%%%%%%%%%%%%%%%%
+            OMPX=zeros(numAssets, 1);
+            r=b;    
+            if desiredSparsity==10
+                SS=[];%mark-about 3
+            end
+            while nnz(OMPX)<desiredSparsity
+                if  r'*r>threshold,
+                    Z=abs(A'*r);
+                    posZ=find(Z==max(Z));
+                    SS=sort([SS,posZ(1)]);
+                    r=b-A(:,SS)*pinv(A(:,SS))*b;    
+                end;
+                OMPX(SS)=pinv(A(:,SS))*b;
+            end
+            %%%%%%%%%%%%%%%%%%%%% Implement Part (2) %%%%%%%%%%%%%%%%%%%%%%
+            M3=M(SS, :);
+            Q3=expandSigma(SS, Sigma);
+            y=ComputePortfolio(M3, Q3, beta);
+            OMPX(SS)=y;
+            selectedAssets=find(OMPX);
+            OMPSelectedAssets{dataSetNumber, sparsity_number}=...
+                names(selectedAssets);
+            %%%%%%%%%%%%%%%%%%%%% Implement Part (3) %%%%%%%%%%%%%%%%%%%%%%
+            OMPVar(dataSetNumber, sparsity_number)=...
+                    calculatePortfolioVarience(OMPX, Sigma);     
+            %%%%%%%%%%%%%%%%%% OMP portfolio returns %%%%%%%%%%%%%%%%%%%%
+            realOMPReturns_month(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_1month,...
+            OMPX);
+            realOMPReturns_3months(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_3months,...
+            OMPX);
+            realOMPReturns_year(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_year,...
+            OMPX);
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+            %%%%%%%%%%%%%%%%%%%%%%%% MP selection strategy %%%%%%%%%%%%%%%%%%%%%
+            MPX=zeros(numAssets,1);
+            r=b;
+            while nnz(MPX)<desiredSparsity
+                if r'*r>threshold,
+                    Z=abs(A'*r);
+                    posZ=find(Z==max(Z),1);
+                    MPX(posZ)=MPX(posZ)+A(:,posZ)'*r;
+                    r=r-A(:,posZ)*A(:,posZ)'*r;
+                end;
+                SS=find(abs(MPX)>1e-8)';
+            end
+            M4=M(SS, :);
+            Q4=expandSigma(SS, Sigma);
+            y=ComputePortfolio(M4, Q4, beta);
+            MPX(SS)=y;   
+            selectedAssets=find(MPX);
+            MPVar(dataSetNumber, sparsity_number)=...
+                    calculatePortfolioVarience(MPX, Sigma);
+            MPSelectedAssets{dataSetNumber, sparsity_number}=...
+                names(selectedAssets);     
+            %%%%%%%%%%%%%%%%%% MP portfolio returns %%%%%%%%%%%%%%%%%%%%
+            realMPReturns_month(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_1month,...
+            MPX);
+            realMPReturns_3months(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_3months,...
+            MPX);
+            realMPReturns_year(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_year,...
+            MPX);
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            %%%%%%%%%%%%%%%%%%%%%% LSOMP selection strategy %%%%%%%%%%%%%%%%%%%
+
+            r=b;
+            %if sparsity_number==1 
+                SS=[];
+                %nnz(SS)
+            %end
+            while nnz(SS)<desiredSparsity
+                if r'*r>threshold,
+                    Z=zeros(numAssets,1);
+                    for jj=1:1:numAssets
+                        SStemp=[SS,jj];
+                        rtemp=b-A(:,SStemp)*pinv(A(:,SStemp))*b;
+                        Z(jj)=rtemp'*rtemp;
+                    end;
+                    posZ=find(Z==min(Z),1);
+                    SS=sort([SS,posZ(1)]);
+                    r=b-A(:,SS)*pinv(A(:,SS))*b;    
+                end;
+                LSOMPX=zeros(numAssets, 1);
+                LSOMPX(SS)=pinv(A(:,SS))*b;
+            end
+            M5=M(SS, :);
+            Q5=expandSigma(SS, Sigma);
+            y=ComputePortfolio(M5, Q5, beta);
+            LSOMPX(SS)=y; 
+            LSOMPVar(dataSetNumber, sparsity_number)=...
+                calculatePortfolioVarience(LSOMPX, Sigma);
+            selectedAssets=find(LSOMPX);
+            LSOMPSelectedAssets{dataSetNumber, sparsity_number}=...
+                names(selectedAssets)   ;
+            %%%%%%%%%%%%%%%%%%%% LSOMP portfolio returns %%%%%%%%%%%%%%%%%%%%%%
+            realLSOMPReturns_month(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_1month,...
+            LSOMPX);
+            realLSOMPReturns_3months(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_3months,...
+            LSOMPX);
+            realLSOMPReturns_year(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_year,...
+            LSOMPX);
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            %%%%%%%%%%%%%%%%% tresholding selection strategy %%%%%%%%%%%%%%
+            thrX=zeros(numAssets, 1); 
+            Z=A'*b; 
+            [Za,posZ]=sort(abs(Z),'descend');
+            r=b;
+            SS=[];
+            while nnz(thrX)<desiredSparsity
+                if r'*r>threshold, 
+                    SS=[SS,posZ(length(SS)+1)];
+                    thrX(SS)=pinv(A(:,SS))*b;
+                    r=b-A(:,SS)*thrX(SS);
+                end;                
+            end
+            M6=M(SS, :);
+            Q6=expandSigma(SS, Sigma);
+            y=ComputePortfolio(M6, Q6, beta);
+            thrX(SS)=y;
+            thrVar(dataSetNumber, sparsity_number)=...
+            calculatePortfolioVarience(thrX, Sigma);
+            selectedAssets=find(thrX);
+            thrSelectedAssets{dataSetNumber, sparsity_number}=...
+                names(selectedAssets)   ;
+            %%%%%%%%%%%%%%%%%%%% thr portfolio returns %%%%%%%%%%%%%%%%%%%%%%
+            realthrReturns_month(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_1month,...
+            thrX);
+            realthrReturns_3months(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_3months,...
+            thrX);
+            realthrReturns_year(dataSetNumber, sparsity_number)=...
+            returnOnInvestment(investmentPrice, rewardPrice_year,...
+            thrX);           
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            
+        end
+    end
+    BNBX_all{kcount}=BNBX;
+    capture_all{kcount}=capture
+    assetsChosenBNBX_all=assetsChosenBNBX
+    realBNBReturns_month_all{kcount}=realBNBReturns_month
+    realBNBReturns_3months_all{kcount}=realBNBReturns_3months
+    realBNBReturns_year_all{kcount}=realBNBReturns_year
+    OMPSelectedAssets_all{kcount}=OMPSelectedAssets
+    OMPVar_all{kcount}=OMPVar
+    realOMPReturns_month_all{kcount}=realOMPReturns_month
+    realOMPReturns_3months_all{kcount}=realOMPReturns_3months
+    realOMPReturns_year_all{kcount}=realOMPReturns_year 
+    MPSelectedAssets_all{kcount}=MPSelectedAssets
+    realMPReturns_month_all{kcount}=realMPReturns_month
+    realMPReturns_3months_all{kcount}=realMPReturns_3months
+    realMPReturns_year_all{kcount}=realMPReturns_year
+    LSOMPSelectedAssets_all{kcount}=LSOMPSelectedAssets
+    realLSOMPReturns_month_all{kcount}=realLSOMPReturns_month
+    realLSOMPReturns_3months_all{kcount}=realLSOMPReturns_3months
+    realLSOMPReturns_year_all{kcount}=realLSOMPReturns_year
+    thrSelectedAssets_all{kcount}=thrSelectedAssets
+    realthrReturns_month_all{kcount}=realthrReturns_month
+    realthrReturns_3months_all{kcount}=realthrReturns_3months
+    realthrReturns_year_all{kcount}=realthrReturns_year
+end
